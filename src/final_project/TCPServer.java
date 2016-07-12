@@ -7,9 +7,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Set;
+
 import org.apache.commons.math3.primes.*;
 
-import com.sun.org.glassfish.external.probe.provider.annotations.Probe;
 
 public class TCPServer {
 	public static void main(String args[]){
@@ -163,19 +166,82 @@ class Connection extends Thread {
 				myWater.right = 0xFFFF;
 			}
 			// TODO compact trash and send to downstream:4444
+			// whole packet is trash
 		}
 	}
 	
 	private void ammoniaCatcher(){
 		for (int x = 0; x < data.size/8; x++){
-			WaterMolocule myWater = data.myList[x];
-			String value = Integer.toString(myWater.data);
-			int[] array = new int[value.length()];
-			for (x = 0; x < value.length(); x++){
-				array[x] = Integer.parseInt(String.valueOf(value.charAt(x)));
-				
-				
+			int value = data.myList[x].data;
+			int a = value % 10;
+			value /= 10;
+			int b = value % 10;
+			if ( a > b ){
+				value /= 10;
 			}
+			while( value > 99){
+				a = value % 10;
+				value /= 10;
+				b = value % 10;
+				value /= 10;
+				int c = value % 10;
+				// c will always loop
+				if ( a > b || b < c ){
+					// number is not undulating
+					return;
+				}
+			}
+			// finished loop number is undulating
+			sludge(data.myList[x].data);				
 		}	
+	}
+	
+	// check for circularly linked list does not actually remove algorithm is implemented as defined, however does not guarantee that
+	// list is not circular after
+	private void seleniumCatcher(){
+		// dictionary will store index in array, and value of data
+		Hashtable dict = new Hashtable();
+		Set<Integer> remo = new HashSet<Integer>();
+		for (int x = 0; x < data.size/8; x++){
+			if (data.myList[x].data != 0){
+				dict.put(x, data.myList[x].data);
+				// add all references to parent classes
+				remo.add(data.myList[x].left);
+				remo.add(data.myList[x].right);
+			}
+		}
+		int max = 0;
+		int index = 0;
+		for ( int parent: remo){
+			if (parent > max){
+				max = parent;
+				index = (int)dict.get(parent);
+			}
+			dict.remove(parent);
+			
+		}
+		// iterate over list to remove reference to max value
+		if( dict.isEmpty()){
+			for (int x = 0; x < data.size/8; x++){
+				if (x == index){
+					// TODO send node to hazmat
+					data.myList[x].data = 0;
+					data.myList[x].left = 0;
+					data.myList[x].right = 0;
+				}
+				if (data.myList[x].left == index){
+					data.myList[x].left = 0;
+				}
+				if (data.myList[x].right == index){
+					data.myList[x].right = 0;
+				}
+			}
+	
+		}
+		// TODO send data to port 1111
+	}
+	
+	private void phosphateCatcher(){
+		
 	}
 }
