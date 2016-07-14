@@ -77,10 +77,12 @@ class WaterMolocule{
 class Worker extends Thread {
 	private static final String FIFO1 = "sludgePipe";
 	private static final String FIFO2 = "chlorinePipe";
+	private static final String FIFO3 = "hazmatPipe";
 	private Socket downstream;
-	private WritableByteChannel trash;
+	private WritableByteChannel trash; // goes directly downstream
 	BufferedWriter sludge;
 	BufferedWriter chlorinator;
+	BufferedWriter hazmatter;
 	DataInputStream input;
 	DataOutputStream output;
 	Socket clientSocket;
@@ -94,6 +96,7 @@ class Worker extends Thread {
 			clientSocket.setSoTimeout(1);
 			sludge = new BufferedWriter(new FileWriter(FIFO1));
 			chlorinator = new BufferedWriter(new FileWriter(FIFO2));
+			hazmatter = new BufferedWriter(new FileWriter(FIFO3));
 			downstream = new Socket( "downstream", 4444);
 			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 			this.start();
@@ -107,7 +110,7 @@ class Worker extends Thread {
 		}
 
 	}
-
+// TODO move socket connection here
 	public void run() {
 
 		try { // get header
@@ -202,7 +205,6 @@ class Worker extends Thread {
 				isTrash = true;
 				data.myList[x].right = 0xFFFF;
 			}
-			// TODO compact trash and send to downstream:4444
 			// whole packet is trash
 		}
 		
@@ -287,6 +289,7 @@ class Worker extends Thread {
 		
 		if ( count == nodes.size() && count > 1){
 			// TODO have selinium 
+			//hazmatter.write(data.myList[x].data);
 		}
 		
 	}
@@ -320,6 +323,7 @@ class Worker extends Thread {
 		
 		if ( count == nodes.size() && count > 1){
 			// TODO have phosphate 
+			//hazmatter.write(data.myList[x].data);
 		}
 		
 	}
@@ -338,6 +342,7 @@ class Worker extends Thread {
 		}
 		if ( count > nodes.size() ){
 			// TODO have mercury
+			//hazmatter.write(data.myList[x].data);
 		}
 	}
 	
