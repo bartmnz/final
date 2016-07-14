@@ -3,5 +3,6 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="/home/sbartholomew/Downloads/commons-math3-3.6.1/commons-math3-3.6.1.jar"/>
+	<classpathentry kind="lib" path="/home/sbartholomew/Downloads/rabbitmq-java-client-bin-3.6.3/rabbitmq-client.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

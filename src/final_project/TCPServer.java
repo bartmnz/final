@@ -1,4 +1,5 @@
 package final_project;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -7,14 +8,17 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 
 import org.apache.commons.math3.primes.*;
 
 
 public class TCPServer {
+	
 	public static void main(String args[]){
 		try {
 			int serverPort = 1111;
@@ -25,7 +29,7 @@ public class TCPServer {
 			while (true){
 				Socket clientSocket = listenServer.accept();
 				//TODO check that connection is from valid range
-				Connection c = new Connection(clientSocket);
+				Worker c = new Worker(clientSocket);
 			}
 			
 		}
@@ -66,18 +70,24 @@ class WaterMolocule{
 	
 }
 
-class Connection extends Thread {
+class Worker extends Thread {
+	private static final String FIFO1 = "sludgePipe";
+	private static final String FIFO2 = "chlorinePipe";
+	BufferedWriter sludge;
+	BufferedWriter chlorinator;
 	DataInputStream input;
 	DataOutputStream output;
 	Socket clientSocket;
 	WaterPayload data;
-
-	public Connection(Socket aClientSocket) {
+	
+	public Worker(Socket aClientSocket) {
 		try {
 			clientSocket = aClientSocket;
 			input = new DataInputStream(clientSocket.getInputStream());
 			// set timeout for read call
 			clientSocket.setSoTimeout(1);
+			sludge = new BufferedWriter(new FileWriter(FIFO1));
+			chlorinator = new BufferedWriter(new FileWriter(FIFO2));
 			this.start();
 
 		}
@@ -107,7 +117,14 @@ class Connection extends Thread {
 				myWater.right = input.readShort();
 				data.add(myWater);
 			}
-
+			// TODO run checks on everything
+			
+			//send it to chlorinator to be sent along the way
+			for (int x = 0; x < data.size/8; x++){
+				if (data.myList[x].data != 0 ){
+					chlorinator.write(data.myList[x].data);
+				}				
+			}
 		}
 
 		catch (EOFException e) {
@@ -146,12 +163,21 @@ class Connection extends Thread {
 
 	private void pooCatcher(){
 		for (int x = 0; x < data.size/8; x++){
-			WaterMolocule myWater = data.myList[x];
-			if (Primes.isPrime(myWater.data)){
-				myWater = new WaterMolocule();
-				data.myList[x] = myWater;
-				sludge(myWater.data);
-				// TODO may have nodes pointing to poo that need to be corrected
+			if (Primes.isPrime(data.myList[x].data)){
+				// send to sludgifier.c
+				try {
+					sludge.write(data.myList[x].data + "/n");
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				// set to zero
+				data.myList[x].data = 0;
+				data.myList[x].left = 0;
+				data.myList[x].right = 0;
+				
+				//sludge(myWater.data);
+				// TODO may have nodes pointing to poo that need to be corrected -- do i care?
 			}
 		}
 	}
@@ -192,56 +218,129 @@ class Connection extends Thread {
 				}
 			}
 			// finished loop number is undulating
-			sludge(data.myList[x].data);				
+			// send to sludgifier.c
+			try {
+				sludge.write(data.myList[x].data + "/n");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			// set to zero
+			data.myList[x].data = 0;
+			data.myList[x].left = 0;
+			data.myList[x].right = 0;
+			
 		}	
 	}
 	
 	// check for circularly linked list does not actually remove algorithm is implemented as defined, however does not guarantee that
 	// list is not circular after
 	private void seleniumCatcher(){
-		// dictionary will store index in array, and value of data
-		Hashtable dict = new Hashtable();
-		Set<Integer> remo = new HashSet<Integer>();
-		for (int x = 0; x < data.size/8; x++){
-			if (data.myList[x].data != 0){
-				dict.put(x, data.myList[x].data);
-				// add all references to parent classes
-				remo.add(data.myList[x].left);
-				remo.add(data.myList[x].right);
+
+		int start = 0;
+		while (start < (data.size/8 -1)){
+			if (data.myList[start].data != 0){
+				break;
 			}
+			start++;
 		}
-		int max = 0;
-		int index = 0;
-		for ( int parent: remo){
-			if (parent > max){
-				max = parent;
-				index = (int)dict.get(parent);
+		//first molocule in chain or last in array
+		int count = 0;
+		Set<Integer> nodes = new HashSet<Integer>();
+		do{
+			if (data.myList[start].left != data.myList[start].right){
+				return;
 			}
-			dict.remove(parent);
-			
+			nodes.add(start);
+			start = data.myList[start].left;
+			count ++;
+		} while (count < data.size/8 && count > 0);
+		
+		if ( count == nodes.size() && count > 1){
+			// TODO have selinium 
 		}
-		// iterate over list to remove reference to max value
-		if( dict.isEmpty()){
-			for (int x = 0; x < data.size/8; x++){
-				if (x == index){
-					// TODO send node to hazmat
-					data.myList[x].data = 0;
-					data.myList[x].left = 0;
-					data.myList[x].right = 0;
-				}
-				if (data.myList[x].left == index){
-					data.myList[x].left = 0;
-				}
-				if (data.myList[x].right == index){
-					data.myList[x].right = 0;
-				}
-			}
-	
-		}
-		// TODO send data to port 1111
+		
 	}
 	
 	private void phosphateCatcher(){
+		int cur = 0;
+		int prev = 0;
+		while (cur < (data.size/8 -1)){
+			if (data.myList[cur].data != 0){
+				if (data.myList[cur].left == 0 ^ data.myList[cur].right == 0){
+					prev = cur;
+					cur = Math.max(data.myList[cur].left, data.myList[cur].right);
+					// TODO is it faster to check max manually?
+					break;
+				}
+			}
+			cur++;
+		}
+		//first molocule in chain or last in array
+		int count = 1;
+		Set<Integer> nodes = new HashSet<Integer>();
+		nodes.add(prev);
+		do{
+			if (!( data.myList[cur].left == prev ^ data.myList[cur].right == prev)){
+				return;
+			}
+			nodes.add(cur);
+			cur = data.myList[cur].left == prev ? data.myList[cur].left : data.myList[cur].right;
+			count ++;
+		} while (count < data.size/8 && count > 0);
+		
+		if ( count == nodes.size() && count > 1){
+			// TODO have phosphate 
+		}
 		
 	}
+	
+	private void mercuryCatcher(){
+		int count = 0;
+		Set<Integer> nodes = new HashSet<Integer>();
+		nodes.add(0); // make sure it will be in the set -- depend on it later
+		for (int x = 0; x < (data.size/8 -1); x++){
+			if (data.myList[x].data != 0 ){			
+			// only valid nodes will have children -- trash has been removed
+			nodes.add(data.myList[x].right);
+			nodes.add(data.myList[x].left);
+			count++;
+			}
+		}
+		if ( count > nodes.size() ){
+			// TODO have mercury
+		}
+	}
+	
+	
+		// TODO when it matters actually try to keep data structure intact
+		/*int count = 0;
+		ArrayList<Integer> nodes = new ArrayList<Integer>();
+		ArrayList<Integer> tofix = new ArrayList<Integer>();
+		for (int x = 0; x < (data.size/8 -1); x++){
+			if (data.myList[x].data == 0){
+				continue;
+			}
+			count++;
+			if (data.myList[x].left != 0 && data.myList[x].left == data.myList[x].right ){
+				nodes.add(x);
+				continue;
+			}
+			tofix.add(x);
+		}
+		int max = (int)(count * .05);
+		int min = (int)(count * .03);
+		count = 0;
+		int fix = nodes.size();
+		while ( fix > max){
+			data.myList[nodes.get(count)].right = 0;
+			count++;
+			fix--;
+		}
+		count = 0;
+		while ( fix < min ){
+			
+		}
+		*/
+	
 }
