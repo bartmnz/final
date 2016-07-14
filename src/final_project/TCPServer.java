@@ -6,8 +6,12 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -73,6 +77,8 @@ class WaterMolocule{
 class Worker extends Thread {
 	private static final String FIFO1 = "sludgePipe";
 	private static final String FIFO2 = "chlorinePipe";
+	private Socket downstream;
+	private WritableByteChannel trash;
 	BufferedWriter sludge;
 	BufferedWriter chlorinator;
 	DataInputStream input;
@@ -88,6 +94,8 @@ class Worker extends Thread {
 			clientSocket.setSoTimeout(1);
 			sludge = new BufferedWriter(new FileWriter(FIFO1));
 			chlorinator = new BufferedWriter(new FileWriter(FIFO2));
+			downstream = new Socket( "downstream", 4444);
+			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 			this.start();
 
 		}
@@ -151,7 +159,8 @@ class Worker extends Thread {
 		}
 
 	}
-	private void sludge(int data){
+	//not gonna do it this way right now -- using fifo pipes to minimize overhead
+	/*private void sludge(int data){
 		ProcessBuilder sludgify = new ProcessBuilder("./sludger", Integer.toString(data));
 		try {
 			sludgify.start();
@@ -159,7 +168,7 @@ class Worker extends Thread {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	}
+	}*/
 
 	private void pooCatcher(){
 		for (int x = 0; x < data.size/8; x++){
@@ -183,16 +192,36 @@ class Worker extends Thread {
 	}
 
 	private void debrisCatcher() {
+		boolean isTrash = false;
 		for (int x = 0; x < data.size/8; x++){
-			WaterMolocule myWater = data.myList[x];
-			if (myWater.left >= data.size/8 || myWater.left <= 0){
-				myWater.left = 0xFFFF;
+			if (data.myList[x].left >= data.size/8 || data.myList[x].left <= 0){
+				isTrash = true;
+				data.myList[x].left = 0xFFFF;
 			}
-			if (myWater.right >= data.size/8 || myWater.right <= 0 ){
-				myWater.right = 0xFFFF;
+			if (data.myList[x].right >= data.size/8 || data.myList[x].right <= 0 ){
+				isTrash = true;
+				data.myList[x].right = 0xFFFF;
 			}
 			// TODO compact trash and send to downstream:4444
 			// whole packet is trash
+		}
+		
+		if (isTrash){
+			ByteBuffer header = ByteBuffer.allocate(data.size/8 + 8);
+			header.putShort((short)1);
+			header.putShort((short)(data.size/8));
+			header.putInt(10211);
+			for (int x = 0; x < data.size/8; x++){ 
+				header.putInt(data.myList[x].data);
+				header.putShort((short)data.myList[x].left);
+				header.putShort((short)data.myList[x].right);
+			}
+			try {
+				trash.write(header);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
 	
