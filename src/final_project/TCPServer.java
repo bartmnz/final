@@ -1,31 +1,27 @@
 package final_project;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Collections;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Hashtable;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 
-import org.apache.commons.math3.primes.*;
+import org.apache.commons.math3.primes.Primes;
 
 
 public class TCPServer {
 	
 	public static void main(String args[]){
 		try {
-			int serverPort = 1111;
+			int serverPort = 1112;
 			ServerSocket listenServer = new ServerSocket(serverPort);
 			System.out.println("Listening on " + serverPort);
 			
@@ -128,14 +124,18 @@ class Worker extends Thread {
 				myWater.right = input.readShort();
 				data.add(myWater);
 			}
+			boolean keepRunning = debrisCatcher();
+			if (keepRunning) keepRunning = mercuryCatcher(true);
+			if (keepRunning) seleniumCatcher();
+			if (keepRunning) pooCatcher();
+			if (keepRunning) ammoniaCatcher();
+			if (keepRunning) phosphateCatcher();
+			chlorineSender();
+			
 			// TODO run checks on everything
 			
 			//send it to chlorinator to be sent along the way
-			for (int x = 0; x < data.size/8; x++){
-				if (data.myList[x].data != 0 ){
-					chlorinator.write(data.myList[x].data);
-				}				
-			}
+			
 		}
 
 		catch (EOFException e) {
@@ -172,6 +172,19 @@ class Worker extends Thread {
 			e.printStackTrace();
 		}
 	}*/
+	
+	private void chlorineSender(){
+		for (int x = 0; x < data.size/8; x++){
+			if (data.myList[x].data != 0 ){
+				try {
+					chlorinator.write(data.myList[x].data);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}				
+		}
+	}
 
 	private void pooCatcher(){
 		for (int x = 0; x < data.size/8; x++){
@@ -194,7 +207,7 @@ class Worker extends Thread {
 		}
 	}
 
-	private void debrisCatcher() {
+	private boolean debrisCatcher() {
 		boolean isTrash = false;
 		for (int x = 0; x < data.size/8; x++){
 			if (data.myList[x].left >= data.size/8 || data.myList[x].left <= 0){
@@ -224,7 +237,9 @@ class Worker extends Thread {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+			return false;
 		}
+		return true;
 	}
 	
 	private void ammoniaCatcher(){
@@ -268,82 +283,146 @@ class Worker extends Thread {
 	// list is not circular after
 	private void seleniumCatcher(){
 
-		int start = 0;
-		while (start < (data.size/8 -1)){
-			if (data.myList[start].data != 0){
-				break;
-			}
-			start++;
-		}
-		//first molocule in chain or last in array
-		int count = 0;
+		// TODO make sure that we are on the first node in a potential list
 		Set<Integer> nodes = new HashSet<Integer>();
-		do{
-			if (data.myList[start].left != data.myList[start].right){
+		nodes.add(0);
+		int count = 0;
+		int cur = 1;
+		int prev = 0;
+		int next = 0;
+		int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
+		while( count < data.size/8){
+			if(data.myList[count].left != prev){
+				next = data.myList[count].left;
+			} else reverse ++;
+			if (data.myList[count].right != prev ){
+				if( next != 0 && data.myList[count].right != 0){
+					return;// two forward nodes
+				}
+				next = data.myList[count].right;
+			} else reverse ++;
+			prev = cur;
+			cur = next;
+			count++;
+			if ( ! nodes.add(next) ) break; // nowhere to go
+			if (reverse != count ){
 				return;
 			}
-			nodes.add(start);
-			start = data.myList[start].left;
-			count ++;
-		} while (count < data.size/8 && count > 0);
-		
-		if ( count == nodes.size() && count > 1){
-			// TODO have selinium 
-			//hazmatter.write(data.myList[x].data);
+		}
+		if ( next == 0 && count == data.size/8){
+			// have selinium
+			int max = 0;
+			int index = 0;
+			for ( int x = 0 ; x < data.size/8; x++){
+				if ( data.myList[x].data > max){
+					max = data.myList[x].data;
+					index = x;
+				}
+			}
+			data.myList[index].data = 0;
+			data.myList[index].left = 0;
+			data.myList[index].right = 0;
+			for ( int x = 0 ; x < data.size/8; x++){
+				if ( data.myList[x].left == index){
+					data.myList[x].left = 0;
+				}
+				if (data.myList[x].right == index){
+					data.myList[x].right = 0;
+				}
+			}
+			try {
+				hazmatter.write(max);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
 		}
 		
 	}
 	
-	private void phosphateCatcher(){
+	private int phosphateCatcher(){
 		int cur = 0;
 		int prev = 0;
+		int start = 0;
+		// go until we find the start of the list 
 		while (cur < (data.size/8 -1)){
-			if (data.myList[cur].data != 0){
-				if (data.myList[cur].left == 0 ^ data.myList[cur].right == 0){
-					prev = cur;
-					cur = Math.max(data.myList[cur].left, data.myList[cur].right);
-					// TODO is it faster to check max manually?
-					break;
-				}
+			//if (data.myList[cur].data != 0){
+			if (data.myList[cur].left == 0 ^ data.myList[cur].right == 0){
+				prev = cur;
+				cur = Math.max(data.myList[cur].left, data.myList[cur].right);
+				// TODO is it faster to check max manually?
+				break;
 			}
+			//}
 			cur++;
 		}
+		start = prev;
 		//first molocule in chain or last in array
 		int count = 1;
-		Set<Integer> nodes = new HashSet<Integer>();
-		nodes.add(prev);
 		do{
 			if (!( data.myList[cur].left == prev ^ data.myList[cur].right == prev)){
-				return;
+				return 1;
 			}
-			nodes.add(cur);
+			//nodes.add(cur);
 			cur = data.myList[cur].left == prev ? data.myList[cur].left : data.myList[cur].right;
 			count ++;
 		} while (count < data.size/8 && count > 0);
 		
-		if ( count == nodes.size() && count > 1){
-			// TODO have phosphate 
-			//hazmatter.write(data.myList[x].data);
+		if ( count == data.size/8 && count > 1){
+			// have phosphate 
+			return -1;
+			// treatment = make chlorine --- its just water pass it allong
+			 
+//			if ( data.myList[start].data > data.myList[cur].data){
+//				cur = start;
+//			}
+//			prev = cur;
+//			cur = Math.max(data.myList[cur].left, data.myList[cur].right);
+//			do{
+//				cur = data.myList[cur].left == prev ? data.myList[cur].left : data.myList[cur].right;
+//				count ++;
+//			} while (count < data.size/8 && count > 0);
+
 		}
+		return 1;
 		
 	}
 	
-	private void mercuryCatcher(){
-		int count = 0;
+	// if we have mercury we CANNOT have any other heavy metals
+	private boolean mercuryCatcher(boolean returnValue){
+		
 		Set<Integer> nodes = new HashSet<Integer>();
 		nodes.add(0); // make sure it will be in the set -- depend on it later
 		for (int x = 0; x < (data.size/8 -1); x++){
-			if (data.myList[x].data != 0 ){			
+			//if (data.myList[x].data != 0 ){ may not need since air counts towards structure 			
 			// only valid nodes will have children -- trash has been removed
 			nodes.add(data.myList[x].right);
 			nodes.add(data.myList[x].left);
-			count++;
+			
+		}
+		if ( data.size/8 > nodes.size() ){
+			Set<Integer> mercury = new HashSet<Integer>();
+			for ( int x = 0; x< (data.size/8 -1); x++){
+				mercury.add(x);
 			}
+			mercury.removeAll(nodes);
+			mercury.remove(Collections.max(mercury));
+			for ( int node : mercury ){
+				try {
+					hazmatter.write(data.myList[node].data);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				data.myList[node].data =0;
+				data.myList[node].left =0;
+				data.myList[node].right=0;
+				data.size -= 8;
+			}
+			return mercuryCatcher(false);
 		}
-		if ( count > nodes.size() ){
-			// TODO have mercury
-			//hazmatter.write(data.myList[x].data);
-		}
+		return returnValue;
 	}
 	
 	

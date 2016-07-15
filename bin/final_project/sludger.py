@@ -1,7 +1,8 @@
 #!/usr/local/bin/python3.5
 
-from ctypes import CDLL
-lib = cdll.LoadLibrary('./sludger.so')
+# from ctypes import CDLL
+# lib = cdll.LoadLibrary('./sludger.so')
+import scrypt 
 
 class Header:
     def __init__(self, blob):
@@ -19,7 +20,8 @@ class Worker(Process):
     
     def run(self):
         for data in iter( self.in_queue.get, None ):
-            self.out_queue.put(lib.sludge(data))
+            # Thank you Primm
+            self.out_queue.put(scrypt.hash(data, 'I Hate Liam Echlin', N=2048, r=4, p=4))
         
 
 class Sender(Process):
@@ -51,13 +53,13 @@ class Sender(Process):
             
 
 def main():
-    fifo = open('sludgePipe', 'r')
+    fifo = open('/home/sbartholomew/sludgePipe', 'r')
     request_queue = Queue()
     output_queue = Queue()
     for i in range(4):
         Worker( request_queue, output_queue ).start()
     Sender(output_queue)
-    for data in the_real_source:
+    for data in the_real_source: #TODO fix this to check for input on the pipe
         request_queue.put( data )
 # Sentinel objects to allow clean shutdown: 1 per worker.
     for i in range(4):

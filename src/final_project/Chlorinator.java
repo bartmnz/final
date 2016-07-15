@@ -12,7 +12,7 @@ import java.nio.channels.WritableByteChannel;
 public class Chlorinator {
 
 	private static final int MAX_SIZE = 400 + 8 + 8; // 100 ints + header + air
-	private static final String FIFO2 = "chlorinePipe";
+	private static final String FIFO2 = "/home/sbartholomew/chlorinePipe";
 	private static ByteBuffer dataOut = ByteBuffer.allocate(MAX_SIZE);
 	private static byte[] dataIn = new byte[400]; // 100 ints
 	private static int actuallyRead;
@@ -23,7 +23,7 @@ public class Chlorinator {
 		
 		try {
 			
-			DataInputStream in = new DataInputStream(new FileInputStream(FIFO2));
+			FileInputStream in = new FileInputStream(FIFO2);
 			
 			while(true){
 				try{
@@ -56,6 +56,7 @@ public class Chlorinator {
 						}
 				}
 				catch (Exception e){
+					System.out.println(e.getMessage());
 					break;
 				}
 					
