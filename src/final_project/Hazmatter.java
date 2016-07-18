@@ -28,8 +28,8 @@ public class Hazmatter {
 			while(true){
 				try{
 					if (in.available() > 400){ // 400 bytes in buffer I have ~100 unique ids
-						downstream = new Socket( "downstream", 8888);
-						waterOut = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
+//						downstream = new Socket( "downstream", 8888);
+//						waterOut = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 						
 						dataOut.clear();
 						actuallyRead = in.read(dataIn, 0, 400);
@@ -44,9 +44,10 @@ public class Hazmatter {
 							dataOut.putInt(wrapper.getInt()); // get data point
 							dataOut.putInt((count+1)); 
 						}
-						waterOut.write(dataOut);
-						waterOut.close();
-						downstream.close();
+						System.out.println("Sending hazmat out");
+//						waterOut.write(dataOut);
+//						waterOut.close();
+//						downstream.close();
 						}
 				}
 				catch (Exception e){
