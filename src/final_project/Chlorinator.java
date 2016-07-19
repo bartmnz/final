@@ -1,5 +1,6 @@
 package final_project;
 
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -7,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
 
@@ -34,15 +36,15 @@ public class Chlorinator {
 			try{
 				
 				int x = in.available();
-				if (x > 16){ // 400 bytes in buffer I have ~100 unique ids
+				if (x > 400){ // 400 bytes in buffer I have ~100 unique ids
 					
-//						downstream = new Socket( "downstream", 1111);
-//						waterOut = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
+					downstream = new Socket( "downstream", 1111);
+					waterOut = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 					
 					dataOut.clear();
 					actuallyRead = in.read(dataIn, 0, 400);
 					// TODO ABC
-					dataOut.putShort((short)1);
+					dataOut.putShort((short)0);
 					int headerSize = (actuallyRead*2) + 8;
 					dataOut.putShort((short)(headerSize)); 
 					dataOut.putInt(10211);
@@ -66,14 +68,14 @@ public class Chlorinator {
 					dataOut.putShort((short)(0)); 
 					dataOut.putShort((short)(0));
 					dataOut.position(0);
-					File file = new File("Chlorine out");
-					FileChannel wChannel = new FileOutputStream( file, false).getChannel();
-					wChannel.write(dataOut);
-					wChannel.close();
-					System.out.println("sending water downstream");
-//						waterOut.write(dataOut);
-//						waterOut.close();
-//						downstream.close();
+//					File file = new File("Chlorine out");
+//					FileChannel wChannel = new FileOutputStream( file, false).getChannel();
+//					wChannel.write(dataOut);
+//					wChannel.close();
+//					System.out.println("sending water downstream");
+					waterOut.write(dataOut);
+					waterOut.close();
+					downstream.close();
 					}
 				
 				Thread.sleep(5);

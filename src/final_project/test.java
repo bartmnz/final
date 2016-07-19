@@ -1,27 +1,26 @@
 package final_project;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
-import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.EOFException;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Collections;
+import java.util.Comparator;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.util.HashSet;
 import java.util.Set;
+
 
 import org.apache.commons.math3.primes.Primes;
 
 
 public class test {
+	//protected static ExecutorService threadPool = Executors.newFixedThreadPool(10);
 	
 	public static void main(String args[]){
 		try {
@@ -77,31 +76,40 @@ class WaterMolocule{
 
 class Worker extends Thread {
 	private static final String FIFO1 = "/home/sbartholomew/sludgePipe";
-	
-	private static final String FIFO3 = "hazmatPipe";
+	private static final String FIFO2 = "/home/sbartholomew/chlorinePipe";
+	private static final String FIFO3 = "/home/sbartholomew/hazmatPipe";
 	private Socket downstream;
 	private WritableByteChannel trash; // goes directly downstream
 	DataOutputStream sludge;
 	DataOutputStream chlorinator;
-	BufferedWriter hazmatter;
+	DataOutputStream hazmatter;
 	DataInputStream input;
 	DataOutputStream output;
 	Socket clientSocket;
 	WaterPayload data;
+	Comparator<Integer> checkIndex;
 	
 	public Worker(Socket aClientSocket) {
 		try {
+			checkIndex = new Comparator<Integer>(){
+				@Override
+				public int compare(Integer arg0, Integer arg1) {
+					if( data.myList[arg0].data == data.myList[arg1].data) return 0;
+					if( data.myList[arg0].data > data.myList[arg1].data) return 1;
+					return -1;
+				}
+			};
+			
+			sludge = new DataOutputStream (new FileOutputStream(FIFO1));
+			chlorinator = new DataOutputStream (new FileOutputStream(FIFO2));
+			hazmatter = new DataOutputStream (new FileOutputStream(FIFO3));
+//			downstream = new Socket( "downstream", 4444);
+//			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 			clientSocket = aClientSocket;
 			input = new DataInputStream(clientSocket.getInputStream());
 			// set timeout for read call
 			clientSocket.setSoTimeout(1);
-			sludge = new DataOutputStream (new FileOutputStream(FIFO1));
-			
-			hazmatter = new BufferedWriter(new FileWriter(FIFO3));
-//			downstream = new Socket( "downstream", 4444);
-//			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 			this.start();
-
 		}
 
 		catch (IOException e) {
@@ -113,8 +121,8 @@ class Worker extends Thread {
 	}
 // TODO move socket connection here
 	public void run() {
-		System.out.println("here");
 		try { // get header
+			
 			short type = input.readShort();
 			short size = input.readShort();
 			int custom = input.readInt();
@@ -132,36 +140,23 @@ class Worker extends Thread {
 			}
 			
 			boolean keepRunning = debrisCatcher();
-			System.out.println("here1");
 			if (keepRunning) keepRunning = mercuryCatcher(true);
-			System.out.println("here2");
 			if (keepRunning) seleniumCatcher();
-			System.out.println("here3");
 			if (keepRunning) pooCatcher();
-			System.out.println("here4");
 			if (keepRunning) ammoniaCatcher();
-			System.out.println("here5");
-			if (keepRunning) phosphateCatcher();
-			System.out.println("here6");
-			try {
-				final String FIFO2 = "/home/sbartholomew/chlorinePipe";
-				chlorinator = new DataOutputStream (new FileOutputStream(FIFO2));
-			} catch (FileNotFoundException e1) {
-				System.out.println("error");
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
+			//if (keepRunning) phosphateCatcher(); //don't even need to run this at the moment as treatment is just chlorinate it
+
 			chlorineSender();
-			try {
-				chlorinator.close();
-			} catch (FileNotFoundException e1) {
-				System.out.println("error");
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
-			System.out.println("here7");
-			
-			// TODO run checks on everything
+//			try {
+//				chlorinator.close();
+//			} catch (FileNotFoundException e1) {
+//				System.out.println("error");
+//				// TODO Auto-generated catch block
+//				e1.printStackTrace();
+//			}
+//			System.out.println("here7");
+//			
+//			// TODO run checks on everything
 			
 			//send it to chlorinator to be sent along the way
 			
@@ -201,9 +196,10 @@ class Worker extends Thread {
 			e.printStackTrace();
 		}
 	}*/
+
 	
 	private void chlorineSender(){
-		System.out.println("here");
+		//System.out.println("here");
 		for (int x = 0; x < data.size; x++){
 			if (data.myList[x].data != 0 ){
 				try {
@@ -242,11 +238,11 @@ class Worker extends Thread {
 	private boolean debrisCatcher() {
 		boolean isTrash = false;
 		for (int x = 0; x < data.size; x++){
-			if (data.myList[x].left >= data.size ){
+			if (data.myList[x].left > data.size ){
 				isTrash = true;
 				data.myList[x].left = 0xFFFF;
 			}
-			if (data.myList[x].right >= data.size ){
+			if (data.myList[x].right > data.size ){
 				isTrash = true;
 				data.myList[x].right = 0xFFFF;
 			}
@@ -358,54 +354,54 @@ class Worker extends Thread {
 		nodes.add(0);
 		int count = 0;
 		int cur = 1;
-		int prev = 0;
+		int prev = 1;
 		int next = 0;
 		int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
 		while( count < data.size){
-			if(data.myList[count].left != prev){
-				next = data.myList[count].left;
+			if(data.myList[cur-1].left != prev){
+				next = data.myList[cur-1].left;
 			} else reverse ++;
-			if (data.myList[count].right != prev ){
-				if( next != 0 && data.myList[count].right != 0){
+			if (data.myList[cur-1].right != prev ){
+				if( next != 0 && data.myList[cur-1].right != next){
 					return;// two forward nodes
 				}
-				next = data.myList[count].right;
+				next = data.myList[cur-1].right;
 			} else reverse ++;
 			prev = cur;
 			cur = next;
 			count++;
-			if ( ! nodes.add(next) ) break; // nowhere to go
-			if (reverse != count ){
-				return;
-			}
+			if ( ! nodes.add(next-1) || next == 0) break; // nowhere to go
+			//if (reverse != count ){
+				//return;
+			//}
 		}
-		if ( next == 0 && count == data.size){
+		if ( next == 1 && count != 0){
 			// have selinium
-			int max = 0;
-			int index = 0;
-			for ( int x = 0 ; x < data.size; x++){
-				if ( data.myList[x].data > max){
-					max = data.myList[x].data;
-					index = x;
-				}
-			}
-			data.myList[index].data = 0;
-			data.myList[index].left = 0;
-			data.myList[index].right = 0;
-			for ( int x = 0 ; x < data.size; x++){
-				if ( data.myList[x].left == index){
-					data.myList[x].left = 0;
-				}
-				if (data.myList[x].right == index){
-					data.myList[x].right = 0;
-				}
-			}
+			int index = Collections.max(nodes, checkIndex);
 			try {
-				hazmatter.write(max);
+				hazmatter.writeInt(data.myList[index].data);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+//			for ( int x = 0 ; x < data.size; x++){
+//				if ( data.myList[x].data > max){
+//					max = data.myList[x].data;
+//					index = x;
+//				}
+//			}
+			data.myList[index].data = 0;
+			data.myList[index].left = 0;
+			data.myList[index].right = 0;
+			for ( int x = 0 ; x < data.size; x++){
+				if ( data.myList[x].left == index+1){
+					data.myList[x].left = 0;
+				}
+				if (data.myList[x].right == index+1){
+					data.myList[x].right = 0;
+				}
+			}
+			
 
 		}
 		
@@ -421,6 +417,7 @@ class Worker extends Thread {
 			if (data.myList[cur].left == 0 ^ data.myList[cur].right == 0){
 				prev = cur;
 				cur = Math.max(data.myList[cur].left, data.myList[cur].right);
+				cur --; // make it have the appropriate index
 				// TODO is it faster to check max manually?
 				break;
 			}
@@ -430,13 +427,16 @@ class Worker extends Thread {
 		start = prev;
 		//first molocule in chain or last in array
 		int count = 1;
+		int temp = 0;
 		do{
-			if (!( data.myList[cur].left == prev ^ data.myList[cur].right == prev)){
+			if (!( data.myList[cur].left == prev+1 ^ data.myList[cur].right == prev+1)){
 				return 1;
 			}
 			//nodes.add(cur);
-			cur = data.myList[cur].left == prev ? data.myList[cur].left : data.myList[cur].right;
-			count ++;
+			temp = data.myList[cur].left == prev ? data.myList[cur].left : data.myList[cur].right;
+			prev = cur;
+			cur = temp -1; // make sure index is correct 
+			count ++; 
 		} while (count < data.size && count > 0);
 		
 		if ( count == data.size && count > 1){
@@ -463,24 +463,27 @@ class Worker extends Thread {
 	private boolean mercuryCatcher(boolean returnValue){
 		
 		Set<Integer> nodes = new HashSet<Integer>();
-		nodes.add(0); // make sure it will be in the set -- depend on it later
+		nodes.add(-1); // make sure it will be in the set -- depend on it later
 		for (int x = 0; x < (data.size); x++){
 			//if (data.myList[x].data != 0 ){ may not need since air counts towards structure 			
 			// only valid nodes will have children -- trash has been removed
-			nodes.add(data.myList[x].right);
-			nodes.add(data.myList[x].left);
+			nodes.add(data.myList[x].right-1); // index as counting numbers 
+			nodes.add(data.myList[x].left-1);
 			
 		}
 		if ( (data.size -1) > nodes.size() ){
 			Set<Integer> mercury = new HashSet<Integer>();
-			for ( int x = 0; x< (data.size); x++){
+			for ( int x = -1; x< (data.size); x++){
 				mercury.add(x);
 			}
 			mercury.removeAll(nodes);
-			mercury.remove(Collections.max(mercury));
+			int index = 0;
+			mercury.remove(Collections.max(mercury, checkIndex));
 			for ( int node : mercury ){
 				try {
-					hazmatter.write(data.myList[node].data);
+					if (data.myList[node].data != 0){
+						hazmatter.writeInt(data.myList[node].data);
+					}
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -493,7 +496,10 @@ class Worker extends Thread {
 			return mercuryCatcher(false);
 		}
 		return returnValue;
+		
 	}
+	
+	
 	
 	
 		// TODO when it matters actually try to keep data structure intact

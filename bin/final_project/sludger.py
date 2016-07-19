@@ -43,14 +43,14 @@ class Sender(Process):
             while(count < 100):
                 hazmat.append(self.queue.get_nowait())
                 count += 1
-#            sludge_outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#            sludge_outgoing.connect(("downstream", 4444))
-            self.header.size = 6400
-            sludge_outgoing.send(header.serialize())
+            sludge_outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sludge_outgoing.connect(("downstream", 4444))
+            self.header.size = 6408
+            sludge_outgoing.send(self.header.serialize())
             while (count > 0):
-                print("hazmatin sending")
-#                sludge_outgoing.send(
-#                    bytes(hazmat[count], 'utf-8'))
+              #  print("hazmatin sending")
+                sludge_outgoing.send(
+                    bytes(hazmat[count], 'utf-8'))
                 count -= 1
             sludge_outgoing.close()
             
