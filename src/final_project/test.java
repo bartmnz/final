@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.util.Collections;
 import java.util.Comparator;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.util.HashSet;
 import java.util.Set;
@@ -24,7 +25,7 @@ public class test {
 	
 	public static void main(String args[]){
 		try {
-			int serverPort = 1112;
+			int serverPort = 1111;
 			ServerSocket listenServer = new ServerSocket(serverPort);
 			System.out.println("Listening on " + serverPort);
 			
@@ -33,6 +34,7 @@ public class test {
 				
 				Socket clientSocket = listenServer.accept();
 				//TODO check that connection is from valid range
+				System.out.format("connection on + %s/n", clientSocket.getInetAddress());
 				Worker c = new Worker(clientSocket);
 			}
 			
@@ -103,8 +105,8 @@ class Worker extends Thread {
 			sludge = new DataOutputStream (new FileOutputStream(FIFO1));
 			chlorinator = new DataOutputStream (new FileOutputStream(FIFO2));
 			hazmatter = new DataOutputStream (new FileOutputStream(FIFO3));
-//			downstream = new Socket( "downstream", 4444);
-//			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
+			downstream = new Socket( "downstream", 4444);
+			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 			clientSocket = aClientSocket;
 			input = new DataInputStream(clientSocket.getInputStream());
 			// set timeout for read call
@@ -141,24 +143,13 @@ class Worker extends Thread {
 			
 			boolean keepRunning = debrisCatcher();
 			if (keepRunning) keepRunning = mercuryCatcher(true);
+			if (keepRunning) leadCatcher();
 			if (keepRunning) seleniumCatcher();
 			if (keepRunning) pooCatcher();
 			if (keepRunning) ammoniaCatcher();
 			//if (keepRunning) phosphateCatcher(); //don't even need to run this at the moment as treatment is just chlorinate it
 
 			chlorineSender();
-//			try {
-//				chlorinator.close();
-//			} catch (FileNotFoundException e1) {
-//				System.out.println("error");
-//				// TODO Auto-generated catch block
-//				e1.printStackTrace();
-//			}
-//			System.out.println("here7");
-//			
-//			// TODO run checks on everything
-			
-			//send it to chlorinator to be sent along the way
 			
 		}
 
@@ -177,6 +168,7 @@ class Worker extends Thread {
 			try {
 
 				clientSocket.close();
+				downstream.close();
 
 			}
 
@@ -186,16 +178,6 @@ class Worker extends Thread {
 		}
 
 	}
-	//not gonna do it this way right now -- using fifo pipes to minimize overhead
-	/*private void sludge(int data){
-		ProcessBuilder sludgify = new ProcessBuilder("./sludger", Integer.toString(data));
-		try {
-			sludgify.start();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}*/
 
 	
 	private void chlorineSender(){
@@ -203,7 +185,7 @@ class Worker extends Thread {
 		for (int x = 0; x < data.size; x++){
 			if (data.myList[x].data != 0 ){
 				try {
-					System.out.println("sending water");
+			//		System.out.println("sending water");
 					chlorinator.writeInt(data.myList[x].data);
 					
 				} catch (IOException e) {
@@ -229,12 +211,30 @@ class Worker extends Thread {
 				data.myList[x].left = 0;
 				data.myList[x].right = 0;
 				
-				//sludge(myWater.data);
 				// TODO may have nodes pointing to poo that need to be corrected -- do i care?
 			}
 		}
 	}
 
+	
+	private void leadCatcher(){
+		int first = 0;
+		for (int x = 0; x < data.size; x++){
+			first = (int)((Math.sqrt(1 + 8*data.myList[x].data)-1)/2);
+			if ( first*first + first  == data.myList[x].data * 2){
+				try {
+					hazmatter.writeInt(data.myList[x].data);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				data.myList[x].data = 0;
+				data.myList[x].left = 0;
+				data.myList[x].right = 0;
+			}
+		}
+	}
+	
 	private boolean debrisCatcher() {
 		boolean isTrash = false;
 		for (int x = 0; x < data.size; x++){
@@ -250,7 +250,7 @@ class Worker extends Thread {
 		}
 		
 		if (isTrash){
-			ByteBuffer header = ByteBuffer.allocate(data.size + 8);
+			ByteBuffer header = ByteBuffer.allocate(data.size*8 + 8);
 			header.putShort((short)1);
 			header.putShort((short)(data.size));
 			header.putInt(10211);
@@ -259,9 +259,8 @@ class Worker extends Thread {
 				header.putShort((short)data.myList[x].left);
 				header.putShort((short)data.myList[x].right);
 			}
-			try {
-				System.out.println("sending trash packet downstream");
-//				trash.write(header);
+			try {				
+				trash.write(header);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -498,38 +497,5 @@ class Worker extends Thread {
 		return returnValue;
 		
 	}
-	
-	
-	
-	
-		// TODO when it matters actually try to keep data structure intact
-		/*int count = 0;
-		ArrayList<Integer> nodes = new ArrayList<Integer>();
-		ArrayList<Integer> tofix = new ArrayList<Integer>();
-		for (int x = 0; x < (data.size -1); x++){
-			if (data.myList[x].data == 0){
-				continue;
-			}
-			count++;
-			if (data.myList[x].left != 0 && data.myList[x].left == data.myList[x].right ){
-				nodes.add(x);
-				continue;
-			}
-			tofix.add(x);
-		}
-		int max = (int)(count * .05);
-		int min = (int)(count * .03);
-		count = 0;
-		int fix = nodes.size();
-		while ( fix > max){
-			data.myList[nodes.get(count)].right = 0;
-			count++;
-			fix--;
-		}
-		count = 0;
-		while ( fix < min ){
-			
-		}
-		*/
 	
 }
