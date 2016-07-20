@@ -25,7 +25,7 @@ public class test {
 	
 	public static void main(String args[]){
 		try {
-			int serverPort = 1111;
+			int serverPort = 1112;
 			ServerSocket listenServer = new ServerSocket(serverPort);
 			System.out.println("Listening on " + serverPort);
 			
@@ -34,7 +34,7 @@ public class test {
 				
 				Socket clientSocket = listenServer.accept();
 				//TODO check that connection is from valid range
-				System.out.format("connection on + %s/n", clientSocket.getInetAddress());
+//				System.out.format("connection on + %s\n", clientSocket.getInetAddress());
 				Worker c = new Worker(clientSocket);
 			}
 			
@@ -105,8 +105,8 @@ class Worker extends Thread {
 			sludge = new DataOutputStream (new FileOutputStream(FIFO1));
 			chlorinator = new DataOutputStream (new FileOutputStream(FIFO2));
 			hazmatter = new DataOutputStream (new FileOutputStream(FIFO3));
-			downstream = new Socket( "downstream", 4444);
-			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
+			//downstream = new Socket( "downstream", 4444);
+			//trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 			clientSocket = aClientSocket;
 			input = new DataInputStream(clientSocket.getInputStream());
 			// set timeout for read call
@@ -136,8 +136,8 @@ class Worker extends Thread {
 			for (int x = 0; x < size; x++){
 				WaterMolocule myWater = new WaterMolocule();
 				myWater.data = input.readInt();
-				myWater.left = input.readShort();
-				myWater.right = input.readShort();
+				myWater.left = input.readUnsignedShort();
+				myWater.right = input.readUnsignedShort();
 				data.add(myWater);
 			}
 			
@@ -148,7 +148,7 @@ class Worker extends Thread {
 			if (keepRunning) pooCatcher();
 			if (keepRunning) ammoniaCatcher();
 			//if (keepRunning) phosphateCatcher(); //don't even need to run this at the moment as treatment is just chlorinate it
-
+//			System.out.println("Sending Chlorine");
 			chlorineSender();
 			
 		}
@@ -168,7 +168,7 @@ class Worker extends Thread {
 			try {
 
 				clientSocket.close();
-				downstream.close();
+				//downstream.close();
 
 			}
 
@@ -185,7 +185,7 @@ class Worker extends Thread {
 		for (int x = 0; x < data.size; x++){
 			if (data.myList[x].data != 0 ){
 				try {
-			//		System.out.println("sending water");
+//					System.out.println("sending water");
 					chlorinator.writeInt(data.myList[x].data);
 					
 				} catch (IOException e) {
@@ -201,6 +201,7 @@ class Worker extends Thread {
 			if (Primes.isPrime(data.myList[x].data)){
 				// send to sludgifier.c
 				try {
+					System.out.println("Sending sludge");
 					sludge.writeInt(data.myList[x].data);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -220,17 +221,20 @@ class Worker extends Thread {
 	private void leadCatcher(){
 		int first = 0;
 		for (int x = 0; x < data.size; x++){
-			first = (int)((Math.sqrt(1 + 8*data.myList[x].data)-1)/2);
-			if ( first*first + first  == data.myList[x].data * 2){
-				try {
-					hazmatter.writeInt(data.myList[x].data);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+			if ( data.myList[x].data != 0){
+				first = (int)((Math.sqrt(1 + 8*data.myList[x].data)-1)/2);
+				if ( first*first + first  == data.myList[x].data * 2){
+					try {
+//						System.out.println("sending Hazmat");
+						hazmatter.writeInt(data.myList[x].data);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					data.myList[x].data = 0;
+					data.myList[x].left = 0;
+					data.myList[x].right = 0;
 				}
-				data.myList[x].data = 0;
-				data.myList[x].left = 0;
-				data.myList[x].right = 0;
 			}
 		}
 	}
@@ -259,7 +263,8 @@ class Worker extends Thread {
 				header.putShort((short)data.myList[x].left);
 				header.putShort((short)data.myList[x].right);
 			}
-			try {				
+			try {
+//				System.out.println("sending trash");
 				trash.write(header);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
@@ -329,6 +334,7 @@ class Worker extends Thread {
 			}
 			if(sludgey){
 				try {
+//					System.out.println("sending Sludge");
 					sludge.writeInt(data.myList[x].data);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -378,6 +384,7 @@ class Worker extends Thread {
 			// have selinium
 			int index = Collections.max(nodes, checkIndex);
 			try {
+//				System.out.println("sending Hazmat");
 				hazmatter.writeInt(data.myList[index].data);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -481,6 +488,7 @@ class Worker extends Thread {
 			for ( int node : mercury ){
 				try {
 					if (data.myList[node].data != 0){
+//						System.out.println("sending Hazmat");
 						hazmatter.writeInt(data.myList[node].data);
 					}
 				} catch (IOException e) {

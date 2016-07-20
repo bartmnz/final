@@ -24,35 +24,38 @@ def encrypt(inq, outq):
         data = inq.get()
         # Thank you Primm
         outq.put(scrypt.hash(str(data), 'I Hate Liam Echlin', N=2048, r=4, p=4))
-        print("hashed hazmat")
+       # print("hashed hazmat")
         inq.task_done()
         
-
-class Sender(Process):
-    def __init__(self, queue):
-        super(Sender, self).__init__()
-        self.queue = queue
-        self.header = Header()
-        
-    def run(self):
-        # TODO set time limit for checking
-        while(True):
-            #set up connection
-            count = 0
-            hazmat = []
-            while(count < 100):
-                hazmat.append(self.queue.get_nowait())
-                count += 1
+   
+def sender(queue):
+    # TODO set time limit for checking
+    header = Header()
+    header.size = 6408
+    while(True):
+        #set up connection
+        payload = bytearray()
+        payload.extend(header.serialize())
+        count = 0
+        while(count < 100):
+            hash = queue.get()
+            payload.extend(hash)
+            count += 1
+        try:
             sludge_outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sludge_outgoing.connect(("downstream", 4444))
-            self.header.size = 6408
-            sludge_outgoing.send(self.header.serialize())
-            while (count > 0):
-              #  print("hazmatin sending")
-                sludge_outgoing.send(
-                    bytes(hazmat[count], 'utf-8'))
-                count -= 1
+            sludge_outgoing.send(bytes(payload, 'utf-8'))
             sludge_outgoing.close()
+        except:
+            f = open('/home/sbartholomew/sludgeOut', 'wb')
+            f.write(payload)
+            f.close()
+#             while (count > 0):
+#               #  print("hazmatin sending")
+#                 sludge_outgoing.send(
+#                     bytes(hazmat[count], 'utf-8'))
+#                 count -= 1
+#             
             
             
             
@@ -68,8 +71,11 @@ def main():
         worker = Thread(target=encrypt, args=(request_queue, output_queue))
         worker.setDaemon(True)
         worker.start()
-    Sender(output_queue)
+    dispatcher = Thread(target=sender, args=(output_queue,))
+    dispatcher.setDaemon(True)
+    dispatcher.start()
     
+    print("Sludger is now listening")
     #io = os.open('/home/sbartholomew/sludgePipe', os.O_RDONLY | os.O_NONBLOCK)
     with open('/home/sbartholomew/sludgePipe') as fifo:
         while(True):
@@ -85,7 +91,7 @@ def main():
                 continue
                 #noting was recieved
             else:
-                print(unpack('!I', buffer))
+            #    print(unpack('!I', buffer))
                 request_queue.put( unpack('!I', buffer) ) 
         
 if __name__ == "__main__":
