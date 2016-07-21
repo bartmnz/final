@@ -58,7 +58,7 @@ public class Chlorinator {
 					actuallyRead = in.read(dataIn, 0, 400);
 					System.out.format("Actualy read %d bytes", actuallyRead);
 					// TODO ABC
-					dataOut.putShort((short)4);
+					dataOut.putShort((short)0);
 					int headerSize = (actuallyRead*2) + 8;
 					dataOut.putShort((short)(headerSize)); 
 					dataOut.putInt(10211);

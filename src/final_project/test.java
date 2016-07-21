@@ -1,21 +1,18 @@
 package final_project;
-import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Collections;
-import java.util.Comparator;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
-
 
 import org.apache.commons.math3.primes.Primes;
 
@@ -25,7 +22,8 @@ public class test {
 	
 	public static void main(String args[]){
 		try {
-			int serverPort = 1112;
+			int serverPort = 1111;
+			@SuppressWarnings("resource")
 			ServerSocket listenServer = new ServerSocket(serverPort);
 			System.out.println("Listening on " + serverPort);
 			
@@ -34,7 +32,8 @@ public class test {
 				
 				Socket clientSocket = listenServer.accept();
 				//TODO check that connection is from valid range
-//				System.out.format("connection on + %s\n", clientSocket.getInetAddress());
+				System.out.format("connection on + %s\n", clientSocket.getInetAddress());
+				@SuppressWarnings("unused")
 				Worker c = new Worker(clientSocket);
 			}
 			
@@ -105,12 +104,11 @@ class Worker extends Thread {
 			sludge = new DataOutputStream (new FileOutputStream(FIFO1));
 			chlorinator = new DataOutputStream (new FileOutputStream(FIFO2));
 			hazmatter = new DataOutputStream (new FileOutputStream(FIFO3));
-			//downstream = new Socket( "downstream", 4444);
-			//trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
+			
 			clientSocket = aClientSocket;
 			input = new DataInputStream(clientSocket.getInputStream());
 			// set timeout for read call
-			clientSocket.setSoTimeout(1);
+			//clientSocket.setSoTimeout(1);
 			this.start();
 		}
 
@@ -125,8 +123,10 @@ class Worker extends Thread {
 	public void run() {
 		try { // get header
 			
+			@SuppressWarnings("unused")
 			short type = input.readShort();
 			short size = input.readShort();
+			@SuppressWarnings("unused")
 			int custom = input.readInt();
 			size = (short) ((size /8) -1);
 			//TODO check that data is there
@@ -166,7 +166,7 @@ class Worker extends Thread {
 		finally {
 
 			try {
-
+				System.out.format("closed + %s\n", clientSocket.getInetAddress());
 				clientSocket.close();
 				//downstream.close();
 
@@ -201,7 +201,7 @@ class Worker extends Thread {
 			if (Primes.isPrime(data.myList[x].data)){
 				// send to sludgifier.c
 				try {
-					System.out.println("Sending sludge");
+//					System.out.println("Sending sludge -- Poo");
 					sludge.writeInt(data.myList[x].data);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -225,7 +225,7 @@ class Worker extends Thread {
 				first = (int)((Math.sqrt(1 + 8*data.myList[x].data)-1)/2);
 				if ( first*first + first  == data.myList[x].data * 2){
 					try {
-//						System.out.println("sending Hazmat");
+						System.out.println("sending Hazmat -- Lead");
 						hazmatter.writeInt(data.myList[x].data);
 					} catch (IOException e) {
 						// TODO Auto-generated catch block
@@ -264,10 +264,13 @@ class Worker extends Thread {
 				header.putShort((short)data.myList[x].right);
 			}
 			try {
-//				System.out.println("sending trash");
+				System.out.println("sending trash");
+				downstream = new Socket( "downstream", 4444);
+				trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
 				trash.write(header);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
+				System.out.println("ERROR: could not connect trash to downstream");
 				e.printStackTrace();
 			}
 			return false;
@@ -334,7 +337,7 @@ class Worker extends Thread {
 			}
 			if(sludgey){
 				try {
-//					System.out.println("sending Sludge");
+//					System.out.println("sending Sludge -- Amonia");
 					sludge.writeInt(data.myList[x].data);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -361,17 +364,17 @@ class Worker extends Thread {
 		int cur = 1;
 		int prev = 1;
 		int next = 0;
-		int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
+		//int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
 		while( count < data.size){
 			if(data.myList[cur-1].left != prev){
 				next = data.myList[cur-1].left;
-			} else reverse ++;
+			} else //reverse ++;
 			if (data.myList[cur-1].right != prev ){
 				if( next != 0 && data.myList[cur-1].right != next){
 					return;// two forward nodes
 				}
 				next = data.myList[cur-1].right;
-			} else reverse ++;
+			} else //reverse ++;
 			prev = cur;
 			cur = next;
 			count++;
@@ -384,7 +387,7 @@ class Worker extends Thread {
 			// have selinium
 			int index = Collections.max(nodes, checkIndex);
 			try {
-//				System.out.println("sending Hazmat");
+				System.out.println("sending Hazmat -- Selinium ");
 				hazmatter.writeInt(data.myList[index].data);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -413,6 +416,7 @@ class Worker extends Thread {
 		
 	}
 	
+	@SuppressWarnings("unused")
 	private int phosphateCatcher(){
 		int cur = 0;
 		int prev = 0;
@@ -470,25 +474,32 @@ class Worker extends Thread {
 		
 		Set<Integer> nodes = new HashSet<Integer>();
 		nodes.add(-1); // make sure it will be in the set -- depend on it later
+		
+		int size = 1; // size starts at 1 because we already added Null to nodes set
 		for (int x = 0; x < (data.size); x++){
 			//if (data.myList[x].data != 0 ){ may not need since air counts towards structure 			
 			// only valid nodes will have children -- trash has been removed
 			nodes.add(data.myList[x].right-1); // index as counting numbers 
 			nodes.add(data.myList[x].left-1);
+			if ( data.myList[x].left !=0 || data.myList[x].right !=0 || data.myList[x].data !=0){
+				size ++;
+			}
+
 			
 		}
-		if ( (data.size -1) > nodes.size() ){
+		if ( (size - 1) > nodes.size() ){ // if there is more than one valid node without a parent
 			Set<Integer> mercury = new HashSet<Integer>();
 			for ( int x = -1; x< (data.size); x++){
 				mercury.add(x);
 			}
 			mercury.removeAll(nodes);
+			@SuppressWarnings("unused")
 			int index = 0;
 			mercury.remove(Collections.max(mercury, checkIndex));
 			for ( int node : mercury ){
 				try {
 					if (data.myList[node].data != 0){
-//						System.out.println("sending Hazmat");
+						System.out.println("sending Hazmat -- Mercury");
 						hazmatter.writeInt(data.myList[node].data);
 					}
 				} catch (IOException e) {

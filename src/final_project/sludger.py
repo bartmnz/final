@@ -6,7 +6,9 @@ import scrypt
 import Queue
 import sys
 import os
+import socket
 import errno
+import traceback
 from threading import Thread
 from subprocess import PIPE, Popen
 from struct import *
@@ -38,15 +40,27 @@ def sender(queue):
         payload.extend(header.serialize())
         count = 0
         while(count < 100):
+            #print("have %d sludge " % (count))
             hash = queue.get()
             payload.extend(hash)
             count += 1
         try:
-            sludge_outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sludge_outgoing.connect(("downstream", 4444))
-            sludge_outgoing.send(bytes(payload, 'utf-8'))
-            sludge_outgoing.close()
+            print("sending sludge downstream")
+            attempts = 0
+            while ( attempts < 10 ):
+                try:
+                    sludge_outgoing = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sludge_outgoing.connect(("downstream", 4444))
+                    sludge_outgoing.send(payload)
+                    sludge_outgoing.close()
+                    break;
+                except:
+                    traceback.print_exc()
+                    if ( attemps == 9 ):
+                        raise Exception
+                attempts +=1
         except:
+            # TODO make error log 
             f = open('/home/sbartholomew/sludgeOut', 'wb')
             f.write(payload)
             f.close()
@@ -75,7 +89,7 @@ def main():
     dispatcher.setDaemon(True)
     dispatcher.start()
     
-    print("Sludger is now listening")
+    print("Sludger v 1.01 is now listening")
     #io = os.open('/home/sbartholomew/sludgePipe', os.O_RDONLY | os.O_NONBLOCK)
     with open('/home/sbartholomew/sludgePipe') as fifo:
         while(True):

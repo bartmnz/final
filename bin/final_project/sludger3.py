@@ -3,7 +3,7 @@
 # from ctypes import CDLL
 # lib = cdll.LoadLibrary('./sludger.so')
 import scrypt 
-import Queue
+import queue
 import sys
 import os
 import socket
@@ -16,7 +16,7 @@ from multiprocessing import Process
 
 class Header:
     def __init__(self):
-        (self.type, self.size, self.custom) = unpack("!HHL", '\x00\x02\x00\x10\x00\x00\x00\x00')
+        (self.type, self.size, self.custom) = unpack("!HHL", b'\x00\x02\x00\x10\x00\x00\x00\x00')
 
     def serialize(self):
         return pack("!HHL", self.type, self.size, self.custom)
@@ -76,8 +76,8 @@ def sender(queue):
 
 def main():
 
-    request_queue = Queue.Queue(maxsize=0)
-    output_queue = Queue.Queue(maxsize=0)
+    request_queue = queue.Queue(maxsize=0)
+    output_queue = queue.Queue(maxsize=0)
 
     BUFFER_SIZE = 4
     
@@ -89,9 +89,9 @@ def main():
     dispatcher.setDaemon(True)
     dispatcher.start()
     
-    print("Sludger v 1.01 is now listening")
+    print("Sludger v 3.01 is now listening")
     #io = os.open('/home/sbartholomew/sludgePipe', os.O_RDONLY | os.O_NONBLOCK)
-    with open('/home/sbartholomew/sludgePipe') as fifo:
+    with open('/home/sbartholomew/sludgePipe', 'rb') as fifo:
         while(True):
             try:
                 buffer = fifo.read(BUFFER_SIZE)
