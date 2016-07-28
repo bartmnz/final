@@ -2,6 +2,7 @@ package final_project;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -12,6 +13,7 @@ import java.nio.channels.WritableByteChannel;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.Set;
 
 import org.apache.commons.math3.primes.Primes;
@@ -26,6 +28,7 @@ public class test {
 			@SuppressWarnings("resource")
 			ServerSocket listenServer = new ServerSocket(serverPort);
 			System.out.println("Listening on " + serverPort);
+			
 			
 			// TODO change to have stop flag 
 			while (true){
@@ -79,11 +82,15 @@ class Worker extends Thread {
 	private static final String FIFO1 = "/home/sbartholomew/sludgePipe";
 	private static final String FIFO2 = "/home/sbartholomew/chlorinePipe";
 	private static final String FIFO3 = "/home/sbartholomew/hazmatPipe";
+	//private static final String FIFO4 = "/home/sbartholomew/reportPipe";
 	private Socket downstream;
 	private WritableByteChannel trash; // goes directly downstream
+	Hashtable<Integer, Integer> fibSeq;
 	DataOutputStream sludge;
 	DataOutputStream chlorinator;
 	DataOutputStream hazmatter;
+	//DataOutputStream reporter;
+	
 	DataInputStream input;
 	DataOutputStream output;
 	Socket clientSocket;
@@ -100,10 +107,20 @@ class Worker extends Thread {
 					return -1;
 				}
 			};
-			
+			fibSeq = new Hashtable<Integer, Integer>(100);
+			int a = 1;
+			int b = 1;
+			int n = 1;
+			while ( n <= 50 ){
+				fibSeq.put(b, b);
+				a += b;
+				b = a - b;
+				n++;
+			}
 			sludge = new DataOutputStream (new FileOutputStream(FIFO1));
 			chlorinator = new DataOutputStream (new FileOutputStream(FIFO2));
 			hazmatter = new DataOutputStream (new FileOutputStream(FIFO3));
+			//reporter = new DataOutputStream (new FileOutputStream(FIFO4));
 			
 			clientSocket = aClientSocket;
 			input = new DataInputStream(clientSocket.getInputStream());
@@ -140,16 +157,19 @@ class Worker extends Thread {
 				myWater.right = input.readUnsignedShort();
 				data.add(myWater);
 			}
-			
+			fungusCatcher();
 			boolean keepRunning = debrisCatcher();
-			if (keepRunning) keepRunning = mercuryCatcher(true);
-			if (keepRunning) leadCatcher();
-			if (keepRunning) seleniumCatcher();
-			if (keepRunning) pooCatcher();
-			if (keepRunning) ammoniaCatcher();
+			if (keepRunning){ 
+				keepRunning = mercuryCatcher(true);
+				leadCatcher(false);
+				if (keepRunning) seleniumCatcher();
+				pooCatcher();
+				ammoniaCatcher();
+				chlorineSender();
+			}
 			//if (keepRunning) phosphateCatcher(); //don't even need to run this at the moment as treatment is just chlorinate it
 //			System.out.println("Sending Chlorine");
-			chlorineSender();
+			
 			
 		}
 
@@ -196,12 +216,55 @@ class Worker extends Thread {
 		}
 	}
 
+	private void fungusCatcher(){
+		for ( int x = 0; x < data.size ; x++){
+			if (fibSeq.contains(data.myList[x].data)){
+				try {
+					hazmatter.writeInt(data.myList[x].data);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				data.myList[x].data = 0;
+				data.myList[x].left = 0;
+				data.myList[x].right = 0;
+			}
+		}
+	}
+	
 	private void pooCatcher(){
+		boolean isPrime;
 		for (int x = 0; x < data.size; x++){
+			if (data.myList[x].data < 0 ){
+				long tooBig  = data.myList[x].data & 0x00000000ffffffffL;
+				if (tooBig % 2 == 0 ) continue; // we can restart the loop
+				isPrime = true;
+				for(int y = 3; y <= Math.sqrt(tooBig); y+=2){
+					if ( tooBig % y == 0 ){
+						isPrime = false;
+						break;	
+					}
+				}
+				// all the way through the loop and no factor !!!
+				if ( isPrime ){
+					try {
+						sludge.writeInt(data.myList[x].data);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					data.myList[x].data = 0;
+					data.myList[x].left = 0;
+					data.myList[x].right = 0;
+					continue;
+				}
+			}
+				
 			if (Primes.isPrime(data.myList[x].data)){
 				// send to sludgifier.c
 				try {
 //					System.out.println("Sending sludge -- Poo");
+					// sendReport(5);
 					sludge.writeInt(data.myList[x].data);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -218,13 +281,15 @@ class Worker extends Thread {
 	}
 
 	
-	private void leadCatcher(){
-		int first = 0;
+	private void leadCatcher(boolean trash){
+		long first = 0;
 		for (int x = 0; x < data.size; x++){
 			if ( data.myList[x].data != 0){
-				first = (int)((Math.sqrt(1 + 8*data.myList[x].data)-1)/2);
-				if ( first*first + first  == data.myList[x].data * 2){
+				long tooBig = data.myList[x].data & 0x00000000ffffffffL;
+				first = (long)((Math.sqrt(1 + 8*tooBig)-1)/2);
+				if ( first*first + first  == tooBig * 2){
 					try {
+						// sendReport(3);
 						System.out.println("sending Hazmat -- Lead");
 						hazmatter.writeInt(data.myList[x].data);
 					} catch (IOException e) {
@@ -232,12 +297,98 @@ class Worker extends Thread {
 						e.printStackTrace();
 					}
 					data.myList[x].data = 0;
-					data.myList[x].left = 0;
-					data.myList[x].right = 0;
+					if ( ! trash){
+						data.myList[x].left = 0;
+						data.myList[x].right = 0;
+					}
+					else{
+						int temp = data.myList[x].left;
+						data.myList[x].left = data.myList[x].right;
+						data.myList[x].right = temp;
+					}
 				}
 			}
 		}
 	}
+	
+/*	private void sendReport(int type){
+		try {
+			// put the short and the type in the report sending thingy
+			reporter.writeShort((short)type);
+			String address = clientSocket.getRemoteSocketAddress().toString();
+			address = address.substring(address.lastIndexOf('.')+ 1, address.indexOf(':'));
+			reporter.writeShort(Short.parseShort(address));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} 
+	}*/ 
+	
+	private void trashCompactor(){
+		//de-lead have to do separately because treatment is different for trash
+		leadCatcher(true);
+		//compact all indices already set to FFFF 
+		
+		Hashtable<Integer, Integer> dictionary = new Hashtable<Integer, Integer>(data.size*2);
+		// dictionary will map the current index to a compressed index
+		
+		dictionary.put(0, 0); // add the null value
+		dictionary.put(0xFFFF, 0xFFFF); // add the out of bounds index
+		
+		int compactedIndex = 1; // how many things we have
+		// iterate over list and find all valid nodes
+		for(int x = 0; x < data.size; x++){
+			if (data.myList[x].data != 0){ // we have a valid node -- not air
+				dictionary.put((x+1), compactedIndex); // <current index in list>, <nth (not air) thing in the list>
+				compactedIndex++; // increment counter
+			}
+		}
+		for(int x = 0; x < data.size; x++){
+			// get the compressed index or null if we are pointing to an air molecule
+			Integer newLeft = dictionary.get(data.myList[x].left);
+			if ( newLeft == null){ // this means we are pointing to an air molecule
+				// follow the pointer and get the index of the thing on its left
+				data.myList[x].left = dictionary.get(data.myList[data.myList[x].left].left); 
+			}
+			// we are not pointing to an air molecule.
+			else{
+				data.myList[x].left = (int)newLeft;
+			}
+			Integer newRight = dictionary.get(data.myList[x].right);
+			if ( newRight == null){ // this means we are pointing to an air molecule
+				// follow the pointer and get the index of the thing on its right
+				data.myList[x].right = dictionary.get(data.myList[data.myList[x].right].right); 
+			}
+			// we are not pointing to an air molecule
+			else{
+				data.myList[x].right = (int)newRight;
+			}
+		}
+		// send data
+		ByteBuffer header = ByteBuffer.allocate(compactedIndex*8 + 8);
+		header.putShort((short)1);
+		header.putShort((short)(compactedIndex));
+		header.putInt(10211);
+		for (int x = 0; x < data.size; x++){ 
+			if ( data.myList[x].data != 0){
+				header.putInt(data.myList[x].data);
+				header.putShort((short)data.myList[x].left);
+				header.putShort((short)data.myList[x].right);
+			}
+		}
+		header.position(0);
+		try {
+			System.out.println("sending trash");
+			downstream = new Socket( "downstream", 2222);
+			trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
+			trash.write(header);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			System.out.println("ERROR: could not connect trash to downstream");
+			e.printStackTrace();
+		}
+	}
+	
 	
 	private boolean debrisCatcher() {
 		boolean isTrash = false;
@@ -254,33 +405,15 @@ class Worker extends Thread {
 		}
 		
 		if (isTrash){
-			ByteBuffer header = ByteBuffer.allocate(data.size*8 + 8);
-			header.putShort((short)1);
-			header.putShort((short)(data.size));
-			header.putInt(10211);
-			for (int x = 0; x < data.size; x++){ 
-				header.putInt(data.myList[x].data);
-				header.putShort((short)data.myList[x].left);
-				header.putShort((short)data.myList[x].right);
-			}
-			try {
-				System.out.println("sending trash");
-				downstream = new Socket( "downstream", 4444);
-				trash = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
-				trash.write(header);
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				System.out.println("ERROR: could not connect trash to downstream");
-				e.printStackTrace();
-			}
+			trashCompactor();
 			return false;
 		}
 		return true;
 	}
 	
 	
-	private boolean undulatingLower(int data){
-		int a, b, c, value = data;
+	private boolean undulatingLower(long data){
+		long a, b, c, value = data;
 		while( value > 99){
 			a = value % 10;
 			value /= 10;
@@ -297,8 +430,8 @@ class Worker extends Thread {
 		return true;
 	}
 	
-	private boolean undulatingHigher(int data){
-		int a, b, c, value = data;
+	private boolean undulatingHigher(long data){
+		long a, b, c, value = data;
 		while( value > 99){
 			a = value % 10;
 			value /= 10;
@@ -316,10 +449,10 @@ class Worker extends Thread {
 	
 	
 	private void ammoniaCatcher(){
-		int a, b, value;
+		long a, b, value;
 		boolean sludgey;
 		for (int x = 0; x < data.size; x++){
-			value = data.myList[x].data;
+			value  = data.myList[x].data & 0x00000000ffffffffL;
 			if (value == 0){
 				continue;
 			}
@@ -338,6 +471,7 @@ class Worker extends Thread {
 			if(sludgey){
 				try {
 //					System.out.println("sending Sludge -- Amonia");
+					// sendReport(6);
 					sludge.writeInt(data.myList[x].data);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -353,6 +487,123 @@ class Worker extends Thread {
 
 	}
 	
+	private void singleForwardNode(int start){
+		// TODO make sure that we are on the first node in a potential list
+				Set<Integer> nodes = new HashSet<Integer>();
+				nodes.add(0);
+				int count = 0;
+				int cur = start;
+				int next = 0;
+				
+				//int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
+				while( count < data.size){
+					next = 0;
+					next = data.myList[cur-1].left;
+					if (next == 0){
+						next = data.myList[cur-1].right;
+					} else if( data.myList[cur-1].right != next && data.myList[cur-1].right != 0){
+						return;// two forward nodes
+					}//else //reverse ++;
+					cur = next;
+					count++;
+					if ( ! nodes.add(next-1) || next == 0) break; // nowhere to go
+					//if (reverse != count ){
+						//return;
+					//}
+				}
+				if ( next == start && count != 0){
+					// have selinium
+					int index = Collections.max(nodes, checkIndex);
+					try {
+						System.out.println("sending Hazmat -- Selinium (single forward)");
+						// sendReport(4);
+						hazmatter.writeInt(data.myList[index].data);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+//					for ( int x = 0 ; x < data.size; x++){
+//						if ( data.myList[x].data > max){
+//							max = data.myList[x].data;
+//							index = x;
+//						}
+//					}
+					data.myList[index].data = 0;
+					data.myList[index].left = 0;
+					data.myList[index].right = 0;
+					for ( int x = 0 ; x < data.size; x++){
+						if ( data.myList[x].left == index+1){
+							data.myList[x].left = 0;
+						}
+						if (data.myList[x].right == index+1){
+							data.myList[x].right = 0;
+						}
+					}
+					
+
+				}
+	}
+	private void doubleForwardNode(int start){
+		// TODO make sure that we are on the first node in a potential list
+				Set<Integer> nodes = new HashSet<Integer>();
+				nodes.add(0);
+				int count = 0;
+				int cur = start;
+				int prev = data.myList[start].left;
+				int next = data.myList[start].right;
+				
+				//int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
+				while( count < data.size){
+					next = 0;
+					// one of them MUST be previous
+					if(data.myList[cur-1].left != prev ^ data.myList[cur-1].right != prev){
+						next = data.myList[cur-1].left;
+						if( next == prev){
+							next = data.myList[cur-1].right;
+					} else break;
+					
+					}//else //reverse ++;
+					prev = cur;
+					cur = next;
+					count++;
+					if ( ! nodes.add(next-1) || next == 0) break; // nowhere to go
+					//if (reverse != count ){
+						//return;
+					//}
+				}
+				if ( next == start && count != 0){
+					// have selinium
+					int index = Collections.max(nodes, checkIndex);
+					try {
+						System.out.println("sending Hazmat -- Selinium (double kind)");
+						// sendReport(4);
+						hazmatter.writeInt(data.myList[index].data);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+//					for ( int x = 0 ; x < data.size; x++){
+//						if ( data.myList[x].data > max){
+//							max = data.myList[x].data;
+//							index = x;
+//						}
+//					}
+					data.myList[index].data = 0;
+					data.myList[index].left = 0;
+					data.myList[index].right = 0;
+					for ( int x = 0 ; x < data.size; x++){
+						if ( data.myList[x].left == index+1){
+							data.myList[x].left = 0;
+						}
+						if (data.myList[x].right == index+1){
+							data.myList[x].right = 0;
+						}
+					}
+					
+
+				}
+	}
+	
 	// check for circularly linked list does not actually remove algorithm is implemented as defined, however does not guarantee that
 	// list is not circular after
 	private void seleniumCatcher(){
@@ -360,59 +611,22 @@ class Worker extends Thread {
 		// TODO make sure that we are on the first node in a potential list
 		Set<Integer> nodes = new HashSet<Integer>();
 		nodes.add(0);
-		int count = 0;
-		int cur = 1;
-		int prev = 1;
-		int next = 0;
-		//int reverse = (data.myList[count].left != 0 && data.myList[count].right !=0) ? 1 : 0;
-		while( count < data.size){
-			if(data.myList[cur-1].left != prev){
-				next = data.myList[cur-1].left;
-			} else //reverse ++;
-			if (data.myList[cur-1].right != prev ){
-				if( next != 0 && data.myList[cur-1].right != next){
-					return;// two forward nodes
+		int cur = 0;
+		while (cur < (data.size )){
+			//if (data.myList[cur].data != 0){
+			if (data.myList[cur].left != 0 || data.myList[cur].right != 0){
+				if (data.myList[cur].left != 0 && data.myList[cur].right != 0 && 
+						data.myList[cur].left != data.myList[cur].right){
+					doubleForwardNode(cur +1);
+					return;// double linked list
 				}
-				next = data.myList[cur-1].right;
-			} else //reverse ++;
-			prev = cur;
-			cur = next;
-			count++;
-			if ( ! nodes.add(next-1) || next == 0) break; // nowhere to go
-			//if (reverse != count ){
-				//return;
+				singleForwardNode(cur + 1);
+				return;
+			}
 			//}
+			cur++;
 		}
-		if ( next == 1 && count != 0){
-			// have selinium
-			int index = Collections.max(nodes, checkIndex);
-			try {
-				System.out.println("sending Hazmat -- Selinium ");
-				hazmatter.writeInt(data.myList[index].data);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-//			for ( int x = 0 ; x < data.size; x++){
-//				if ( data.myList[x].data > max){
-//					max = data.myList[x].data;
-//					index = x;
-//				}
-//			}
-			data.myList[index].data = 0;
-			data.myList[index].left = 0;
-			data.myList[index].right = 0;
-			for ( int x = 0 ; x < data.size; x++){
-				if ( data.myList[x].left == index+1){
-					data.myList[x].left = 0;
-				}
-				if (data.myList[x].right == index+1){
-					data.myList[x].right = 0;
-				}
-			}
-			
-
-		}
+		
 		
 	}
 	
@@ -488,6 +702,27 @@ class Worker extends Thread {
 			
 		}
 		if ( (size - 1) > nodes.size() ){ // if there is more than one valid node without a parent
+			
+			try{
+				File file = new File("SampleMercury");
+				WritableByteChannel wChannel = Channels.newChannel(new FileOutputStream( file ));
+				ByteBuffer dataOut = ByteBuffer.allocate((data.size*8)+8);
+				dataOut.putShort((short)0);
+				int headerSize = (data.size*8) + 8;
+				dataOut.putShort((short)(headerSize)); 
+				dataOut.putInt(10211);
+				for (int x=0; x < data.size; x++){
+					dataOut.putInt(data.myList[x].data); // get data point
+					dataOut.putShort((short)data.myList[x].left); 
+					dataOut.putShort((short)data.myList[x].right);
+				}
+				dataOut.position(0);
+				wChannel.write(dataOut);
+				wChannel.close();
+			}
+			catch (Exception e){
+				System.out.println("Could not write sample to file");
+			}
 			Set<Integer> mercury = new HashSet<Integer>();
 			for ( int x = -1; x< (data.size); x++){
 				mercury.add(x);

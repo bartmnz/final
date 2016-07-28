@@ -26,7 +26,6 @@ public class Chlorinator {
 		int actuallyRead;
 		WritableByteChannel waterOut;
 		Socket downstream;
-		FileChannel wChannel;
 		FileInputStream in = null;
 		
 		try {
@@ -43,7 +42,6 @@ public class Chlorinator {
 				if (x > 400){ // 400 bytes in buffer I have ~100 unique ids
 					waterOut = null;
 					downstream = null;
-					wChannel = null;
 					try{
 						downstream = new Socket( "downstream", 1111);
 						waterOut = Channels.newChannel(new DataOutputStream(downstream.getOutputStream()));
@@ -51,34 +49,34 @@ public class Chlorinator {
 					catch(IOException e){
 						System.out.println("socket Exception");
 						File file = new File("ChlorineOut");
-						wChannel = new FileOutputStream( file, false).getChannel();
-						wChannel.write(dataOut);
+						waterOut = new FileOutputStream( file, false).getChannel();
 					}
 					dataOut.clear();
 					actuallyRead = in.read(dataIn, 0, 400);
 					System.out.format("Actualy read %d bytes", actuallyRead);
 					// TODO ABC
 					dataOut.putShort((short)0);
-					int headerSize = (actuallyRead*2) + 8;
+					int headerSize = (actuallyRead*2) + 16;
 					dataOut.putShort((short)(headerSize)); 
 					dataOut.putInt(10211);
 					
 					ByteBuffer wrapper = ByteBuffer.wrap(dataIn);
 					int count = 0;
-					while (count < 3){ 
+					while (count < 4){ 
 						dataOut.putInt(wrapper.getInt()); // get data point
 						dataOut.putShort((short)(count+1));  // double link = chlorine
 						dataOut.putShort((short)(count+1)); // double link = chlorine
 						count++;
 					}
 					int max = actuallyRead/4;
-					while (count < max -1){
+					while (count < max ){
 						dataOut.putInt(wrapper.getInt()); // get data point
 						dataOut.putShort((short)(count+1)); 
 						dataOut.putShort((short)(0));
 						count ++;
 					}
-					dataOut.putInt(wrapper.getInt()); // get data point
+					//dataOut.putInt(wrapper.getInt()); // get data point
+					dataOut.putInt(0);
 					dataOut.putShort((short)(0)); 
 					dataOut.putShort((short)(0));
 					dataOut.position(0);
@@ -86,14 +84,10 @@ public class Chlorinator {
 //					FileChannel wChannel = new FileOutputStream( file, false).getChannel();
 //					
 					System.out.println("sending water downstream");
-					if( waterOut != null){
-						waterOut.write(dataOut);
-						waterOut.close();
-						downstream.close();
-					}else{
-						wChannel.write(dataOut);
-						wChannel.close();
-					}
+					waterOut.write(dataOut);
+					waterOut.close();
+					downstream.close();
+					
 					
 					}
 				

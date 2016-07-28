@@ -33,13 +33,13 @@ def encrypt(inq, outq):
 def sender(queue):
     # TODO set time limit for checking
     header = Header()
-    header.size = 6408
+    header.size = 1416
     while(True):
         #set up connection
         payload = bytearray()
         payload.extend(header.serialize())
         count = 0
-        while(count < 100):
+        while(count < 22):
             #print("have %d sludge " % (count))
             hash = queue.get()
             payload.extend(hash)
